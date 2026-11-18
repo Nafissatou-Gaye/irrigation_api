@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#16a34a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Irrigation" />
+  <title>Irrigation Intelligente</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg:       #061209;
+      --surface:  #0a1e0d;
+      --border:   rgba(74,222,128,0.09);
+      --text:     #dcfce7;
+      --muted:    #6b9e7a;
+      --teal:     #4ade80;
+      --red:      #fb923c;
+      --blue:     #60a5fa;
+      --purple:   #a78bfa;
+      --green:    #4ade80;
+      --amber:    #f59e0b;
+    }
+
+    html, body { height: 100%; font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); }
+
+    /* ── HEADER ── */
+    header {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 32px;
+      background: rgba(7,9,15,0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .header-logo {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, #16a34a, #4ade80);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .header-logo svg { width: 20px; height: 20px; fill: #fff; }
+    .header-title { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+    .header-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .live-dot {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--green); font-weight: 500;
+    }
+    .live-dot::before {
+      content: '';
+      width: 7px; height: 7px; border-radius: 50%; background: var(--green);
+      animation: pulse-dot 2s infinite;
+    }
+    @keyframes pulse-dot {
+      0%,100% { box-shadow: 0 0 0 0 rgba(74,222,128,0.5); }
+      50%      { box-shadow: 0 0 0 5px rgba(74,222,128,0); }
+    }
+    .mode-pill {
+      padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      transition: all 0.3s;
+    }
+    .mode-pill.auto   { background: rgba(79,172,254,0.12); color: var(--blue);   border: 1px solid rgba(79,172,254,0.25); }
+    .mode-pill.manuel { background: rgba(245,158,11,0.12); color: var(--amber);  border: 1px solid rgba(245,158,11,0.25); }
+    #last-update { font-size: 11px; color: var(--muted); }
+
+    /* ── LAYOUT ── */
+    main { padding: 28px 32px; max-width: 1400px; margin: 0 auto; }
+
+    /* ── METRIC CARDS ── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 700px) { .metrics-grid { grid-template-columns: repeat(2,1fr); } }
+    @media (max-width: 500px) { .metrics-grid { grid-template-columns: repeat(2,1fr); gap: 10px; } }
+
+    /* ── INSTALL BANNER ── */
+    #install-banner {
+      display: none;
+      align-items: center; justify-content: space-between;
+      background: linear-gradient(135deg, rgba(74,222,128,0.15), rgba(22,163,74,0.1));
+      border: 1px solid rgba(74,222,128,0.3);
+      border-radius: 12px; padding: 14px 18px;
+      margin-bottom: 20px;
+    }
+    #install-banner p { font-size: 13px; color: var(--text); }
+    #install-banner p span { color: var(--teal); font-weight: 600; }
+    #btn-install {
+      padding: 8px 20px; border-radius: 8px; border: none;
+      background: var(--teal); color: #000; font-weight: 700;
+      font-size: 13px; cursor: pointer; font-family: 'Inter', sans-serif;
+      white-space: nowrap; margin-left: 12px;
+    }
+
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px 20px;
+      display: flex; flex-direction: column; align-items: center; gap: 16px;
+      position: relative; overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .metric-card:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+    .metric-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: var(--accent);
+    }
+    .metric-card[data-accent="teal"]   { --accent: var(--teal); }
+    .metric-card[data-accent="red"]    { --accent: var(--red); }
+    .metric-card[data-accent="blue"]   { --accent: var(--blue); }
+    .metric-card[data-accent="purple"] { --accent: var(--purple); }
+
+    .gauge-wrap { position: relative; width: 120px; height: 120px; }
+    .gauge-wrap svg { transform: rotate(-90deg); }
+    .gauge-bg   { fill: none; stroke: rgba(255,255,255,0.06); stroke-width: 8; }
+    .gauge-fill { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 0.8s cubic-bezier(.4,0,.2,1); }
+    .gauge-text {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    .gauge-value { font-size: 22px; font-weight: 700; line-height: 1; }
+    .gauge-unit  { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+    .metric-label { font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+
+    /* ── BOTTOM ROW ── */
+    .bottom-row { display: grid; grid-template-columns: 300px 1fr; gap: 16px; margin-bottom: 20px; }
+    @media (max-width: 900px) { .bottom-row { grid-template-columns: 1fr; } }
+
+    /* ── MOBILE ADJUSTMENTS ── */
+    @media (max-width: 600px) {
+      main { padding: 16px; }
+      header { padding: 14px 16px; }
+      .header-sub { display: none; }
+      #last-update { display: none; }
+      .gauge-wrap { width: 90px; height: 90px; }
+      .gauge-wrap svg { width: 90px; height: 90px; }
+      .gauge-value { font-size: 17px; }
+      .metric-card { padding: 16px 12px; gap: 10px; }
+      .pump-indicator { width: 80px; height: 80px; }
+      .pump-inner { width: 50px; height: 50px; }
+      .pump-inner svg { width: 22px; height: 22px; }
+      .btn { padding: 12px 6px; font-size: 12px; }
+    }
+
+    /* ── PUMP CARD ── */
+    .pump-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 20px;
+      display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 20px;
+    }
+    .pump-title { font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; align-self: flex-start; }
+    .pump-indicator {
+      width: 100px; height: 100px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      position: relative; transition: all 0.4s;
+    }
+    .pump-indicator.on {
+      background: radial-gradient(circle, rgba(16,185,129,0.3), rgba(16,185,129,0.05));
+      box-shadow: 0 0 0 12px rgba(74,222,128,0.08), 0 0 40px rgba(74,222,128,0.2);
+    }
+    .pump-indicator.off {
+      background: radial-gradient(circle, rgba(100,116,139,0.15), rgba(100,116,139,0.03));
+    }
+    .pump-indicator.on::before {
+      content: ''; position: absolute; inset: -10px; border-radius: 50%;
+      border: 1.5px solid rgba(74,222,128,0.3);
+      animation: pump-ring 2s infinite;
+    }
+    @keyframes pump-ring {
+      0%   { transform: scale(0.95); opacity: 1; }
+      100% { transform: scale(1.15); opacity: 0; }
+    }
+    .pump-inner {
+      width: 64px; height: 64px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.4s;
+    }
+    .pump-inner.on  { background: var(--green); box-shadow: 0 0 24px rgba(74,222,128,0.6); }
+    .pump-inner.off { background: rgba(100,116,139,0.2); }
+    .pump-inner svg { width: 28px; height: 28px; }
+    .pump-inner.on  svg { fill: #fff; }
+    .pump-inner.off svg { fill: var(--muted); }
+    .pump-status { font-size: 20px; font-weight: 700; transition: color 0.4s; }
+    .pump-status.on  { color: var(--green); }
+    .pump-status.off { color: var(--muted); }
+    .pump-reason { font-size: 11px; color: var(--muted); text-align: center; }
+
+    /* ── CONTROLS ── */
+    .controls { display: flex; gap: 10px; width: 100%; }
+    .btn {
+      flex: 1; padding: 10px 8px; border: none; border-radius: 10px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      font-family: 'Inter', sans-serif; transition: all 0.2s; letter-spacing: 0.2px;
+    }
+    .btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+    .btn:active { transform: translateY(0); }
+    .btn-on   { background: rgba(16,185,129,0.15);  color: var(--green); border: 1px solid rgba(16,185,129,0.3);  }
+    .btn-off  { background: rgba(255,107,107,0.12); color: var(--red);   border: 1px solid rgba(255,107,107,0.25); }
+    .btn-auto { background: rgba(79,172,254,0.12);  color: var(--blue);  border: 1px solid rgba(79,172,254,0.25);  }
+
+    /* ── CHART CARD ── */
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+    }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .card-header h2 { font-size: 14px; font-weight: 600; color: var(--text); }
+    .chart-legend { display: flex; gap: 16px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    /* ── TABLE CARD ── */
+    .table-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      overflow: hidden;
+    }
+    .table-wrap { overflow-x: auto; margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th {
+      padding: 10px 14px; text-align: left;
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.7px;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody td {
+      padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.03);
+      color: #94a3b8; transition: background 0.15s;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: rgba(255,255,255,0.03); }
+    .badge {
+      display: inline-block; padding: 3px 12px; border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+    }
+    .badge.irriguer { background: rgba(16,185,129,0.12); color: var(--green);  border: 1px solid rgba(16,185,129,0.25); }
+    .badge.non      { background: rgba(100,116,139,0.1);  color: var(--muted); border: 1px solid rgba(100,116,139,0.2); }
+    .id-cell { color: var(--muted); font-size: 12px; }
+
+    /* ── SECTION TITLE ── */
+    .section-title {
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.8px;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="header-logo">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+    </div>
+    <div>
+      <div class="header-title">Irrigation Intelligente</div>
+      <div class="header-sub">Systeme de surveillance en temps reel</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-dot">En direct</div>
+    <div id="mode-badge" class="mode-pill auto">Automatique</div>
+    <div id="last-update">--</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- Bandeau installation PWA -->
+  <div id="install-banner">
+    <p>Installe <span>Irrigation Intelligente</span> sur ton telephone</p>
+    <button id="btn-install" onclick="installerApp()">Installer</button>
+  </div>
+
+  <!-- Métriques -->
+  <div class="metrics-grid">
+    <div class="metric-card" data-accent="teal">
+      <div class="gauge-wrap">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <circle class="gauge-bg" cx="60" cy="60" r="52"/>
+          <circle class="gauge-fill" id="g-humidity" cx="60" cy="60" r="52"
+            stroke="var(--teal)" stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
+        </svg>
+        <div class="gauge-text">
+          <span class="gauge-value" id="val-humidity" style="color:var(--teal)">--</span>
+          <span class="gauge-unit">%</span>
+        </div>
+      </div>
+      <div class="metric-label">Humidite Sol</div>
+    </div>
+
+    <div class="metric-card" data-accent="red">
+      <div class="gauge-wrap">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <circle class="gauge-bg" cx="60" cy="60" r="52"/>
+          <circle class="gauge-fill" id="g-temp" cx="60" cy="60" r="52"
+            stroke="var(--red)" stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
+        </svg>
+        <div class="gauge-text">
+          <span class="gauge-value" id="val-temp" style="color:var(--red)">--</span>
+          <span class="gauge-unit">°C</span>
+        </div>
+      </div>
+      <div class="metric-label">Temperature</div>
+    </div>
+
+    <div class="metric-card" data-accent="blue">
+      <div class="gauge-wrap">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <circle class="gauge-bg" cx="60" cy="60" r="52"/>
+          <circle class="gauge-fill" id="g-water" cx="60" cy="60" r="52"
+            stroke="var(--blue)" stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
+        </svg>
+        <div class="gauge-text">
+          <span class="gauge-value" id="val-water" style="color:var(--blue)">--</span>
+          <span class="gauge-unit">%</span>
+        </div>
+      </div>
+      <div class="metric-label">Niveau Reservoir</div>
+    </div>
+
+  </div>
+
+  <!-- Pompe + Graphique -->
+  <div class="bottom-row">
+    <div class="pump-card">
+      <div class="pump-title">Etat de la Pompe</div>
+      <div class="pump-indicator off" id="pump-indicator">
+        <div class="pump-inner off" id="pump-inner">
+          <svg viewBox="0 0 24 24"><path d="M17 8C8 10 5.9 16.17 3.82 19.49c-1.05 1.72.67 3.54 2.25 2.41C7.66 20.7 10 18.13 10 15v-.1c3.27.58 5.58 2.33 7.5 4.6C19.19 21.72 21 20.46 21 18.5V9a1 1 0 0 0-1-1h-3z"/></svg>
+        </div>
+      </div>
+      <div class="pump-status off" id="pump-status">ARRET</div>
+      <div class="pump-reason" id="pump-reason">En attente de donnees</div>
+      <div class="controls">
+        <button class="btn btn-on"   onclick="commandeManuelle(true)">Activer</button>
+        <button class="btn btn-off"  onclick="commandeManuelle(false)">Arreter</button>
+        <button class="btn btn-auto" onclick="modeAuto()">Auto</button>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="card-header">
+        <h2>Historique des mesures</h2>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--teal)"></div>Humidite</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Temperature</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Reservoir</div>
+        </div>
+      </div>
+      <canvas id="chart" height="90"></canvas>
+    </div>
+  </div>
+
+  <!-- Tableau -->
+  <div class="table-card">
+    <div class="card-header">
+      <h2>Dernieres mesures</h2>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Horodatage</th>
+            <th>Humidite sol</th>
+            <th>Temperature</th>
+            <th>Niveau eau</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">Chargement des donnees...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  // URL dynamique : fonctionne sur localhost ET via ngrok
+  const API = window.location.origin;
+  const CIRC = 326.7;
+
+  function setGauge(id, value, max) {
+    const pct = Math.min(Math.max(value / max, 0), 1);
+    document.getElementById(id).style.strokeDashoffset = CIRC * (1 - pct);
+  }
+
+  const ctx = document.getElementById("chart").getContext("2d");
+  const chart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: [],
+      datasets: [
+        { label: "Humidite (%)",   data: [], borderColor: "#4ade80", backgroundColor: "rgba(74,222,128,0.08)",  tension: 0.4, fill: true, pointRadius: 3, pointHoverRadius: 5 },
+        { label: "Temperature (C)", data: [], borderColor: "#fb923c", backgroundColor: "rgba(251,146,60,0.06)",  tension: 0.4, fill: true, pointRadius: 3, pointHoverRadius: 5 },
+        { label: "Reservoir (%)",  data: [], borderColor: "#60a5fa", backgroundColor: "rgba(96,165,250,0.06)",  tension: 0.4, fill: true, pointRadius: 3, pointHoverRadius: 5 }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "#0a1e0d",
+          borderColor: "rgba(74,222,128,0.12)",
+          borderWidth: 1,
+          titleColor: "#e2e8f0",
+          bodyColor: "#94a3b8",
+          padding: 12
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: "#475569", font: { size: 11 } },
+          grid:  { color: "rgba(255,255,255,0.04)" }
+        },
+        y: {
+          ticks: { color: "#475569", font: { size: 11 } },
+          grid:  { color: "rgba(255,255,255,0.04)" }
+        }
+      }
+    }
+  });
+
+  async function updateDashboard() {
+    try {
+      const [status, hist] = await Promise.all([
+        fetch(`${API}/status`).then(r => r.json()),
+        fetch(`${API}/history?limit=20`).then(r => r.json())
+      ]);
+
+      const m = status.derniere_mesure;
+      const d = status.decision_ia;
+
+      if (m) {
+        document.getElementById("val-humidity").textContent = m.humidity.toFixed(1);
+        document.getElementById("val-temp").textContent     = m.temperature.toFixed(1);
+        document.getElementById("val-water").textContent    = m.water_level.toFixed(1);
+        setGauge("g-humidity", m.humidity,    100);
+        setGauge("g-temp",     m.temperature, 60);
+        setGauge("g-water",    m.water_level, 100);
+      }
+
+      const on = status.pompe;
+      document.getElementById("pump-indicator").className = "pump-indicator " + (on ? "on" : "off");
+      document.getElementById("pump-inner").className     = "pump-inner "     + (on ? "on" : "off");
+      document.getElementById("pump-status").className    = "pump-status "    + (on ? "on" : "off");
+      document.getElementById("pump-status").textContent  = on ? "EN MARCHE" : "ARRET";
+      document.getElementById("pump-reason").textContent  = d ? d.reason : "";
+
+      const badge = document.getElementById("mode-badge");
+      badge.textContent  = status.mode === "manuel" ? "Manuel" : "Automatique";
+      badge.className    = "mode-pill " + (status.mode === "manuel" ? "manuel" : "auto");
+
+      document.getElementById("last-update").textContent = new Date().toLocaleTimeString("fr-FR");
+
+      const reversed = [...hist.mesures].reverse();
+      chart.data.labels              = reversed.map(m => m.date.slice(11, 19));
+      chart.data.datasets[0].data   = reversed.map(m => m.humidity);
+      chart.data.datasets[1].data   = reversed.map(m => m.temperature);
+      chart.data.datasets[2].data   = reversed.map(m => m.water_level);
+      chart.update("none");
+
+      document.getElementById("table-body").innerHTML = hist.mesures.map(m => `
+        <tr>
+          <td class="id-cell">${m.id}</td>
+          <td>${m.date.slice(0,19).replace("T"," ")}</td>
+          <td>${m.humidity.toFixed(1)} %</td>
+          <td>${m.temperature.toFixed(1)} °C</td>
+          <td>${m.water_level.toFixed(1)} %</td>
+        </tr>
+      `).join("");
+
+    } catch (e) { console.error("Erreur API :", e); }
+  }
+
+  async function commandeManuelle(activer) {
+    await fetch(`${API}/manual`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ activate: activer })
+    });
+    updateDashboard();
+  }
+
+  async function modeAuto() {
+    await fetch(`${API}/manual`, { method: "DELETE" });
+    updateDashboard();
+  }
+
+  updateDashboard();
+  setInterval(updateDashboard, 10000);
+
+  // ── SERVICE WORKER ────────────────────────────────────
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js")
+      .then(() => console.log("Service Worker enregistre"))
+      .catch(e => console.error("SW erreur :", e));
+  }
+
+  // ── INSTALLATION PWA ──────────────────────────────────
+  let deferredPrompt;
+  window.addEventListener("beforeinstallprompt", e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    document.getElementById("install-banner").style.display = "flex";
+  });
+
+  function installerApp() {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(() => {
+      deferredPrompt = null;
+      document.getElementById("install-banner").style.display = "none";
+    });
+  }
+
+  window.addEventListener("appinstalled", () => {
+    document.getElementById("install-banner").style.display = "none";
+  });
+</script>
+</body>
+</html>
